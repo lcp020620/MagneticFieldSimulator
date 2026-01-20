@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Magnetic Field Simulator Version 0.1.0</title>
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <style>
+        .box { border: 1px solid #ccc; padding: 15px; margin-bottom: 10px; border-radius: 5px; }
+        .hidden { display: none; }
+        .btn-add { background-color: #28a745; color: white; padding: 10px; cursor: pointer; }
+        .btn-run { background-color: #007bff; color: white; padding: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h2>전류 벡터 설계</h2>
+    <div class="box">
+        <label>모양: </label>
+        <select id="shape" onchange="toggleFields()">
+            <option value="straight">직선</option>
+            <option value="circle">원</option>
+        </select>
+        
+        <br><br>
+        <label>전류 세기: </label>
+        <input type="number" id="intensity" step="0.1" value="1.0">
+
+        <div id="vector_fields" style="margin-top:15px;">
+            <div id="v1_label"><strong>정보 1 (x, y, z):</strong></div>
+            <input type="number" id="v1x" value="0"> <input type="number" id="v1y" value="0"> <input type="number" id="v1z" value="0">
+            
+            <div id="v2_label" style="margin-top:10px;"><strong>정보 2 (x, y, z):</strong></div>
+            <input type="number" id="v2x" value="0"> <input type="number" id="v2y" value="0"> <input type="number" id="v2z" value="0">
+            
+            <div id="radius_field" class="hidden" style="margin-top:10px;">
+                <strong>반지름 (Radius):</strong><br>
+                <input type="number" id="radius" step="0.1" value="1.0">
+            </div>
+        </div>
+
+        <br>
+        <button class="btn-add" onclick="addCurrent()">반영</button>
+    </div>
+
+    <div class="box">
+        <p>현재 등록된 구성 요소: <span id="count">0</span>개</p>
+        <button class="btn-run" onclick="location.href='/newplot'">시뮬레이션 가동</button>
+    </div>
+
+    <script>
+        const socket = io();
+
+        function toggleFields() {
+            const shape = document.getElementById('shape').value;
+            const rField = document.getElementById('radius_field');
+            const l1 = document.getElementById('v1_label');
+            const l2 = document.getElementById('v2_label');
+
+            if (shape === 'circle') {
+                rField.classList.remove('hidden');
+                l1.innerHTML = "<strong>중심 좌표 (x, y, z):</strong>";
+                l2.innerHTML = "<strong>법선 벡터 (x, y, z):</strong>";
+            } else {
+                rField.classList.add('hidden');
+                l1.innerHTML = "<strong>시작점 (x, y, z):</strong>";
+                l2.innerHTML = "<strong>끝점 (x, y, z):</strong>";
+            }
+        }
+
+        function addCurrent() {
+            const data = {
+                shape: document.getElementById('shape').value,
+                intensity: document.getElementById('intensity').value,
+                v1: [document.getElementById('v1x').value, document.getElementById('v1y').value, document.getElementById('v1z').value],
+                v2: [document.getElementById('v2x').value, document.getElementById('v2y').value, document.getElementById('v2z').value],
+                radius: document.getElementById('radius').value
+            };
+            socket.emit('add_element', data);
+        }
+
+        socket.on('add_success', (res) => {
+            alert('정보가 반영되었습니다.');
+            document.getElementById('count').innerText = res.count;
+        });
+
+        socket.on('error', (res) => alert('에러 발생: ' + res.msg));
+    </script>
+</body>
+</html>
