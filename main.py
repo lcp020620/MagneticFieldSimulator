@@ -1,3 +1,4 @@
+#====imports for Magnetic Field calculation====
 import cupy as cp
 import numpy as np
 import matplotlib.pyplot as plt
@@ -5,9 +6,17 @@ from currentgenerator import CurrentGen
 from magneticfieldsimulator import MagneticFieldSimulator
 from vectorgenerator import VectorGenerator
 from vectorgenerator import row
+#==============================================
+#====imports for fastAPI communication=========
 import pandas as pd
+import io
+from fastapi import FastAPI, File, UploadFile
+from fastapi.responses import StreamingResponse, HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
+#==============================================
 
-#create a mesh -- if mesh is too dense, quiver will die
+
+#create a mesh
 simulator = MagneticFieldSimulator()
 meshDense = 30
 width = 10
@@ -39,7 +48,7 @@ ROIIdx = simulator.isROI(space=r, ROI=ROI, range=2)
 #==============================================#
 
 
-#execution quiver
+#data preprocessing for fastAPI
 grim = plt.figure().add_subplot(projection='3d')
 if  activateROI:
     plotMF = cp.asnumpy(MF[ROIIdx, :])
@@ -47,26 +56,19 @@ if  activateROI:
 else:
     plotMF = cp.asnumpy(MF)
     plotr = cp.asnumpy(r)
-
 csvArray = np.concatenate([plotr[:, 0:3], plotMF[:, 0:3]], axis=1)
-#np.savetxt('MFArray.csv', csvArray, delimiter=',')
 pdcsvArray = pd.DataFrame(csvArray, columns=['x', 'y', 'z', 'vx', 'vy', 'vz'])
+
+#send data to fastAPI
 pdcsvArray.to_csv('C:/[git]MagneticFieldSimulator/MFArray.csv', index=False)
 
-# plotMF_maxnorm = float(cp.max(cp.linalg.norm(MF, axis=1)))
-# maxArrowLen = 1.5*width/10
-# grim.quiver(plotr[:, 0], plotr[:, 1], plotr[:, 2], 
-#             plotMF[:, 0], plotMF[:, 1], plotMF[:, 2], 
-#             color='blue', length=maxArrowLen/plotMF_maxnorm)
-
-# plotdLArray = cp.asnumpy(dLArray)
-# grim.quiver(plotdLArray[:, 0], plotdLArray[:,1], plotdLArray[:,2], 
-#             plotdLArray[:,3], plotdLArray[:,4], plotdLArray[:,5], 
-#             color='red')
-# grim.set_xlabel("X")
-# grim.set_xlim(-width, width)
-# grim.set_ylabel("Y")
-# grim.set_ylim(-length, length)
-# grim.set_zlabel("Z")
-# grim.set_zlim(-height, height)
-# plt.show()
+# app = FastAPI()
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],
+#     allow_methods=["*"],
+#     allow_headers=["*"]
+# )
+# @app.get("/", response_class=HTMLResponse)
+# async def get_upload_form():
+#     NotImplemented
