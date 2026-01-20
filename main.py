@@ -7,12 +7,9 @@ from magneticfieldsimulator import MagneticFieldSimulator
 from vectorgenerator import VectorGenerator
 from vectorgenerator import row
 #==============================================
-#====imports for fastAPI communication=========
+#====imports for Flask communication=========
 import pandas as pd
-import io
-from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import StreamingResponse, HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware
+from flask import Flask
 #==============================================
 
 
@@ -62,13 +59,3 @@ pdcsvArray = pd.DataFrame(csvArray, columns=['x', 'y', 'z', 'vx', 'vy', 'vz'])
 #send data to fastAPI
 pdcsvArray.to_csv('C:/[git]MagneticFieldSimulator/MFArray.csv', index=False)
 
-# app = FastAPI()
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["*"],
-#     allow_methods=["*"],
-#     allow_headers=["*"]
-# )
-# @app.get("/", response_class=HTMLResponse)
-# async def get_upload_form():
-#     NotImplemented
