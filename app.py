@@ -3,9 +3,8 @@ from flask_socketio import SocketIO, emit
 from flask_currentgenerator import CurrentGen
 import cupy as cp
 import numpy as np
-import pandas as pd
 from magneticfieldsimulator import MagneticFieldSimulator
-from scipy.integrate import solve_ivp
+import webview
 
 app = Flask(__name__)
 socketio = SocketIO(app)
@@ -134,4 +133,6 @@ def resetData():
     return '', 204
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
+    # socketio.run(app, debug=True)
+    window = webview.create_window("Magnetic Field Simulator", app)
+    webview.start()
