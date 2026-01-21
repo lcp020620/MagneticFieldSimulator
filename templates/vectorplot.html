@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Magnetic Field Visualization - InstancedMesh</title>
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #050505; color: white; font-family: sans-serif; }
+        #ui { position: absolute; top: 20px; left: 20px; z-index: 10; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 8px; }
+        input { margin-top: 10px; color: white; }
+        .info { font-size: 12px; color: #aaa; margin-top: 5px; }
+        #downloadBtn { 
+            margin-top: 15px; 
+            padding: 8px 12px; 
+            background: #28a745; 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-weight: bold;
+        }
+        #downloadBtn:hover { background: #218838; }
+        #previousBtn { 
+            margin-top: 15px; 
+            padding: 8px 12px; 
+            background: #28a745; 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-weight: bold;
+        }
+        #previousBtn:hover { background: #218838; }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <h3>Magnetic Field Visualization</h3>
+    <button id="downloadBtn">Download this data as .csv file</button>
+    <button id="previousBtn">Go back to simulation settings</button>
+</div>
+
+
+<!-- Three.js 및 관련 라이브러리 로드 -->
+<script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // Flask에서 전달된 데이터를 JS 배열로 변환 (Jinja2 safe 필터 사용)
+    const rawData = {{ data|tojson|safe }};
+
+    let scene, camera, renderer, controls, instancedMesh;
+    const MAX_INSTANCES = 150000;
+
+    init();
+    animate();
+    
+    // 데이터가 존재할 경우 즉시 렌더링 실행
+    if (rawData && rawData.length > 0) {
+        renderMagneticField(rawData);
+    } else {
+        document.getElementById('status').innerText = "표시할 데이터가 없습니다.";
+    }
+
+    function init() {
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(50, 50, 100);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        controls = new OrbitControls(camera, renderer.domElement);
+        
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(1, 1, 1);
+        scene.add(directionalLight);
+
+        window.addEventListener('resize', onWindowResize);
+        document.getElementById('downloadBtn').addEventListener('click', downloadCSV);
+    }
+
+    // CSV 파일 생성 및 다운로드 함수
+    function downloadCSV() {
+        if (!rawData || rawData.length === 0) {
+            alert("Error occured : No data.");
+            return;
+        }
+
+        let csvContent = "x,y,z,bx,by,bz\n";
+        rawData.forEach(row => {
+            csvContent += row.join(",") + "\n";
+        });
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        link.setAttribute("href", url);
+        link.setAttribute("download", `magnetic_field_data_${timestamp}.csv`);
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    function renderMagneticField(data) {
+        if (instancedMesh) {
+            scene.remove(instancedMesh);
+            instancedMesh.geometry.dispose();
+            instancedMesh.material.dispose();
+        }
+
+        const count = Math.min(data.length, MAX_INSTANCES);
+        
+        // 원뿔(Cone) 형태로 변경하여 화살표 방향성을 더 명확히 함
+        const geometry = new THREE.ConeGeometry(0.15, 1, 4); 
+        const material = new THREE.MeshPhongMaterial({ color: 0xffffff });
+
+        instancedMesh = new THREE.InstancedMesh(geometry, material, count);
+
+        const dummy = new THREE.Object3D();
+        const color = new THREE.Color();
+
+        for (let i = 0; i < count; i++) {
+            const [x, y, z, bx, by, bz] = data[i];
+            const magnitude = Math.sqrt(bx*bx + by*by + bz*bz);
+            
+            dummy.position.set(x, y, z);
+
+            const direction = new THREE.Vector3(bx, by, bz).normalize();
+            // ConeGeometry의 기본 정점 방향은 Y축(+)입니다.
+            const arrowDir = new THREE.Vector3(0, 1, 0); 
+            dummy.quaternion.setFromUnitVectors(arrowDir, direction);
+
+            // 크기 조절: 세기에 따라 길이 변화
+            const scale = Math.min(magnitude * 0.5, 5.0);
+            dummy.scale.set(1, scale, 1);
+
+            dummy.updateMatrix();
+            instancedMesh.setMatrixAt(i, dummy.matrix);
+
+            // 색상: 세기에 따라 파란색(약함) -> 빨간색(강함)
+            const hue = Math.max(0, 0.7 - (magnitude * 0.1));
+            color.setHSL(hue, 1.0, 0.5);
+            instancedMesh.setColorAt(i, color);
+        }
+
+        instancedMesh.instanceMatrix.needsUpdate = true;
+        if (instancedMesh.instanceColor) instancedMesh.instanceColor.needsUpdate = true;
+
+        scene.add(instancedMesh);
+        // document.getElementById('status').innerText = `${count.toLocaleString()} 개의 데이터 시각화 완료`;
+    }
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+    }
+
+    //go back to settings
+    document.getElementById('previousBtn').addEventListener('click', function() {
+        fetch('/resetData', { method: 'POST' })
+        .then(() => {
+            window.location.href = "/";
+        })
+        .catch(err => {
+            console.error("Failed to reset data: ", err);
+        });
+    });
+
+</script>
+</body>
+</html>

@@ -75,9 +75,9 @@ def handle_remove_element(data):
     except Exception as e:
         emit('error', {'msg': str(e)})
 
-#==========Simulation Start==========
-@app.route('/newplot')
-def newplot():
+#==========Simulation Start(vector plot)==========
+@app.route('/vectorplot')
+def vectorplot():
     global MF
     global r
     dLArray = cp.zeros((0, 7), dtype=cp.float32)
@@ -96,7 +96,31 @@ def newplot():
     csvArray = np.concatenate([plotr[:, 0:3], plotMF[:, 0:3]], axis=1)
     csvArray.transpose()
     data_to_send = csvArray.tolist()
-    return render_template('newplot.html', data=data_to_send)
+    return render_template('vectorplot.html', data=data_to_send)
+
+#==========Simulation Start(line plot)==========
+@app.route('/lineplot')
+def lineplot():
+    global MF
+    global r
+    dLArray = cp.zeros((0, 7), dtype=cp.float32)
+    #==========make current vector array==========
+    for _ in current_elements:
+        _.getCurrent()
+        dLArray = cp.append(dLArray, _.getCurrent(), axis=0)
+    
+    #==========simulate magnetic field==========
+    simulator = MagneticFieldSimulator()
+    r = simulator.makeMesh(dense=meshDense, width=width, length=length, height=height)
+    MF = simulator.makeMF(dLArray=dLArray)
+
+    plotMF = cp.asnumpy(MF)
+    plotr = cp.asnumpy(r)
+    csvArray = np.concatenate([plotr[:, 0:3], plotMF[:, 0:3]], axis=1)
+    csvArray.transpose()
+    data_to_send = csvArray.tolist()
+    NotImplemented      #여기다가 자기력선 검출하는 프로그램을 scipy로 작성해야함
+    return render_template('lineplot.html', data=data_to_send)
 
 @app.route('/resetData', methods=['POST'])
 def resetData():
