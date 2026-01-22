@@ -1,1 +1,3 @@
-__pychae__
+__pychae__/
+*.csv
+venv/
