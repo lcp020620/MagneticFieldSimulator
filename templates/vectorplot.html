@@ -39,7 +39,7 @@
     <h3>Magnetic Field Visualization</h3>
     <button id="downloadBtn">Download this data as .csv file</button>
     <button id="previousBtn">Go back to simulation settings</button>
-    <button onclick="if (confirm('Turn off simulation?')) {fetch('/shutdown', { method: 'POST' }).then(() => {window.close();});}">Simulation turn off</button>
+    <button onclick="location.herf='goodbye.html';if (confirm('Turn off simulation?')) {fetch('/shutdown', { method: 'POST' });location.herf='goodbye.html';}">Simulation turn off</button>
 </div>
 
 <script type="importmap">
@@ -54,6 +54,7 @@
 <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
     const rawData = {{ data|tojson|safe }};
     const socket = io();
@@ -124,11 +125,36 @@
         }
 
         const count = Math.min(data.length, MAX_INSTANCES);
+        const arrowGeom = new THREE.BufferGeometry();
 
-        const geometry = new THREE.ConeGeometry(0.15, 1, 4); 
-        const material = new THREE.MeshPhongMaterial({ color: 0xffffff });
+        // 1. 원기둥 (화살표 몸통)
+        const bodyRadius = 0.02; // 몸통 두께 (더 얇게 조정 가능)
+        const bodyHeight = 0.7;  // 몸통 길이
+        const cylinder = new THREE.CylinderGeometry(bodyRadius, bodyRadius, bodyHeight, 6);
+        cylinder.translate(0, bodyHeight / 2, 0); // 밑단을 중심에 맞춤
+        // 2. 원뿔 (화살표 머리)
+        const headRadius = 0.06; // 머리 두께
+        const headHeight = 0.3;  // 머리 길이
+        const cone = new THREE.ConeGeometry(headRadius, headHeight, 6);
+        cone.translate(0, bodyHeight + (headHeight / 2), 0); // 몸통 끝 위에 배치
+        // 3. 두 지오메트리 합치기 (BufferGeometryUtils 대신 단순 merge 사용 가능)
+        
+        // 만약 import가 번거롭다면 아래처럼 간단히 합칩니다.
+        const combinedGeometry = [cylinder, cone];
+        
+        // InstancedMesh에 사용할 최종 지오메트리
+        const finalGeometry = mergeGeometries([cylinder, cone]);
 
-        instancedMesh = new THREE.InstancedMesh(geometry, material, count);
+        // --- 재질 설정 (투명도 유지) ---
+        const material = new THREE.MeshPhongMaterial({ 
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.6,
+            depthWrite: false 
+        });
+
+        // instancedMesh = new THREE.InstancedMesh(geometry, material, count);
+        instancedMesh = new THREE.InstancedMesh(finalGeometry, material, count);
 
         const dummy = new THREE.Object3D();
         const color = new THREE.Color();
@@ -143,8 +169,10 @@
             const arrowDir = new THREE.Vector3(0, 1, 0); 
             dummy.quaternion.setFromUnitVectors(arrowDir, direction);
 
-            // 크기 조절: 세기에 따라 길이 변화
-            const scale = Math.min(magnitude * 0.5, 5.0);
+            // 크기 조절: 세기에 따라 길이 변화 -> 너무 겹쳐서 없애기로 함
+            const maxScale = 1;
+            const sensitivity = 0.1;
+            const scale = Math.min(magnitude * sensitivity, maxScale);
             dummy.scale.set(1, scale, 1);
 
             dummy.updateMatrix();
