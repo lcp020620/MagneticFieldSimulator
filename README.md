@@ -1,6 +1,9 @@
 # Magnetic Field Simulator
 introduction video
-    [한국어] https://youtu.be/XghdGBYB3hE (English Subtitle is ready)
+    https://youtu.be/XghdGBYB3hE (English Subtitle is ready)
+How to use this on Google Colab video
+    https://youtu.be/CR1B1KkAaRE (English Subtitle is ready)
+
 This simulates intensity and dirction of magnetic field of each location via Finite Element Method.
 You must install CUDA for your hardware before executing this program.
 You may use it for educational/research purposes without asking me!
